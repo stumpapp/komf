@@ -19,6 +19,8 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
+.kotlin
+
 ### eclipse ###
 .apt_generated
 .classpath

@@ -27,6 +27,14 @@ data class KavitaConfig(
 )
 
 @Serializable
+data class StumpConfig(
+    val baseUri: String = "http://localhost:10801",
+    val apiKey: String = "",
+    val eventListener: EventListenerConfig = EventListenerConfig(enabled = false),
+    val metadataUpdate: MetadataUpdateConfig = MetadataUpdateConfig(),
+)
+
+@Serializable
 data class EventListenerConfig(
     val enabled: Boolean = false,
     val metadataLibraryFilter: Collection<String> = emptyList(),

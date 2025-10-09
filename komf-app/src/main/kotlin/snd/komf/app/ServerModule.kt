@@ -35,6 +35,7 @@ import snd.komf.mediaserver.jobs.KomfJobTracker
 import snd.komf.mediaserver.jobs.KomfJobsRepository
 import snd.komf.mediaserver.model.MediaServer.KAVITA
 import snd.komf.mediaserver.model.MediaServer.KOMGA
+import snd.komf.mediaserver.model.MediaServer.STUMP
 import snd.komf.notifications.apprise.AppriseCliService
 import snd.komf.notifications.apprise.AppriseVelocityTemplates
 import snd.komf.notifications.discord.DiscordVelocityTemplates
@@ -133,6 +134,17 @@ class ServerModule(
                         mediaServerClient = dynamicDependencies.map { it.kavitaMediaServerClient }
                     ).registerRoutes(this)
                 }
+
+                route("/stump") {
+                    MetadataRoutes(
+                        metadataServiceProvider = dynamicDependencies.map { it.stumpMetadataServiceProvider },
+                        mediaServerClient = dynamicDependencies.map { it.stumpMediaServerClient },
+                    ).registerRoutes(this)
+
+                    MediaServerRoutes(
+                        mediaServerClient = dynamicDependencies.map { it.stumpMediaServerClient }
+                    ).registerRoutes(this)
+                }
             }
         }
     }
@@ -171,6 +183,8 @@ class ApiDynamicDependencies(
     val komgaMetadataServiceProvider: MetadataServiceProvider,
     val kavitaMediaServerClient: MediaServerClient,
     val kavitaMetadataServiceProvider: MetadataServiceProvider,
+    val stumpMediaServerClient: MediaServerClient,
+    val stumpMetadataServiceProvider: MetadataServiceProvider,
     val discordService: DiscordWebhookService,
     val discordRenderer: DiscordVelocityTemplates,
     val appriseService: AppriseCliService,

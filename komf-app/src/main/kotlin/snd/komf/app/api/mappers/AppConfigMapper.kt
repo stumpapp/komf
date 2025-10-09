@@ -10,6 +10,7 @@ import snd.komf.api.config.EventListenerConfigDto
 import snd.komf.api.config.KavitaConfigDto
 import snd.komf.api.config.KomfConfig
 import snd.komf.api.config.KomgaConfigDto
+import snd.komf.api.config.StumpConfigDto
 import snd.komf.api.config.MangaBakaConfigDto
 import snd.komf.api.config.MangaBakaDatabaseDto
 import snd.komf.api.config.MangaDexConfigDto
@@ -27,6 +28,7 @@ import snd.komf.mediaserver.config.EventListenerConfig
 import snd.komf.mediaserver.config.KavitaConfig
 import snd.komf.mediaserver.config.KomgaConfig
 import snd.komf.mediaserver.config.MetadataPostProcessingConfig
+import snd.komf.mediaserver.config.StumpConfig
 import snd.komf.mediaserver.config.MetadataProcessingConfig
 import snd.komf.mediaserver.config.MetadataUpdateConfig
 import snd.komf.notifications.NotificationsConfig
@@ -53,6 +55,7 @@ class AppConfigMapper {
             metadataProviders = toDto(config.metadataProviders, mangaBakaDbMetadata),
             komga = toDto(config.komga),
             kavita = toDto(config.kavita),
+            stump = toDto(config.stump),
             notifications = toDto(config.notifications),
         )
     }
@@ -68,6 +71,14 @@ class AppConfigMapper {
 
     private fun toDto(config: KavitaConfig): KavitaConfigDto {
         return KavitaConfigDto(
+            baseUri = config.baseUri,
+            eventListener = toDto(config.eventListener),
+            metadataUpdate = toDto(config.metadataUpdate),
+        )
+    }
+
+    private fun toDto(config: StumpConfig): StumpConfigDto {
+        return StumpConfigDto(
             baseUri = config.baseUri,
             eventListener = toDto(config.eventListener),
             metadataUpdate = toDto(config.metadataUpdate),

@@ -6,6 +6,7 @@ import okhttp3.logging.HttpLoggingInterceptor.Level.BASIC
 import snd.komf.mediaserver.config.DatabaseConfig
 import snd.komf.mediaserver.config.KavitaConfig
 import snd.komf.mediaserver.config.KomgaConfig
+import snd.komf.mediaserver.config.StumpConfig
 import snd.komf.notifications.NotificationsConfig
 import snd.komf.providers.MetadataProvidersConfig
 
@@ -13,6 +14,7 @@ import snd.komf.providers.MetadataProvidersConfig
 data class AppConfig(
     val komga: KomgaConfig = KomgaConfig(),
     val kavita: KavitaConfig = KavitaConfig(),
+    val stump: StumpConfig = StumpConfig(),
     val database: DatabaseConfig = DatabaseConfig(),
     val metadataProviders: MetadataProvidersConfig = MetadataProvidersConfig(),
     val notifications: NotificationsConfig = NotificationsConfig(),

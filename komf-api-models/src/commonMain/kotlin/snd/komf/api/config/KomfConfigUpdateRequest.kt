@@ -14,6 +14,7 @@ import snd.komf.api.PatchValue
 data class KomfConfigUpdateRequest(
     val komga: PatchValue<KomgaConfigUpdateRequest> = PatchValue.Unset,
     val kavita: PatchValue<KavitaConfigUpdateRequest> = PatchValue.Unset,
+    val stump: PatchValue<StumpConfigUpdateRequest> = PatchValue.Unset,
     val notifications: PatchValue<NotificationConfigUpdateRequest> = PatchValue.Unset,
     val metadataProviders: PatchValue<MetadataProvidersConfigUpdateRequest> = PatchValue.Unset,
 )
@@ -29,6 +30,14 @@ data class KomgaConfigUpdateRequest(
 
 @Serializable
 data class KavitaConfigUpdateRequest(
+    val baseUri: PatchValue<String> = PatchValue.Unset,
+    val apiKey: PatchValue<String> = PatchValue.Unset,
+    val eventListener: PatchValue<EventListenerConfigUpdateRequest> = PatchValue.Unset,
+    val metadataUpdate: PatchValue<MetadataUpdateConfigUpdateRequest> = PatchValue.Unset,
+)
+
+@Serializable
+data class StumpConfigUpdateRequest(
     val baseUri: PatchValue<String> = PatchValue.Unset,
     val apiKey: PatchValue<String> = PatchValue.Unset,
     val eventListener: PatchValue<EventListenerConfigUpdateRequest> = PatchValue.Unset,

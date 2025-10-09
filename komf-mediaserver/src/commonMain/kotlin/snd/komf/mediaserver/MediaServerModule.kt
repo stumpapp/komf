@@ -22,6 +22,7 @@ import snd.komf.mediaserver.config.DatabaseConfig
 import snd.komf.mediaserver.config.KavitaConfig
 import snd.komf.mediaserver.config.KomgaConfig
 import snd.komf.mediaserver.config.MetadataProcessingConfig
+import snd.komf.mediaserver.config.StumpConfig
 import snd.komf.mediaserver.config.MetadataUpdateConfig
 import snd.komf.mediaserver.jobs.KomfJobTracker
 import snd.komf.mediaserver.jobs.KomfJobsRepository
@@ -34,6 +35,10 @@ import snd.komf.mediaserver.kavita.KavitaMediaServerClientAdapter
 import snd.komf.mediaserver.kavita.KavitaTokenProvider
 import snd.komf.mediaserver.komga.KomgaEventHandler
 import snd.komf.mediaserver.komga.KomgaMediaServerClientAdapter
+import snd.komf.mediaserver.stump.StumpApiKeyAuthProvider
+import snd.komf.mediaserver.stump.StumpClient
+import snd.komf.mediaserver.stump.StumpEventHandler
+import snd.komf.mediaserver.stump.StumpMediaServerClientAdapter
 import snd.komf.mediaserver.metadata.MetadataEventHandler
 import snd.komf.mediaserver.metadata.MetadataMapper
 import snd.komf.mediaserver.metadata.MetadataMerger
@@ -65,6 +70,7 @@ import kotlin.time.Instant
 class MediaServerModule(
     komgaConfig: KomgaConfig,
     kavitaConfig: KavitaConfig,
+    stumpConfig: StumpConfig,
     databaseConfig: DatabaseConfig,
     jsonBase: Json,
     ktorBaseClient: HttpClient,
@@ -98,6 +104,17 @@ class MediaServerModule(
     private val kavitaMetadataEventHandler: MetadataEventHandler
     private val kavitaNotificationsHandler: NotificationsEventHandler?
     private val kavitaEventHandler: KavitaEventHandler
+
+    val stumpMediaServerClient: StumpMediaServerClientAdapter
+    val stumpMetadataServiceProvider: MetadataServiceProvider
+    private val stumpBookThumbnailRepository: BookThumbnailsRepository
+    private val stumpSerThumbnailsRepository: SeriesThumbnailsRepository
+    private val stumpSeriesMatchRepository: SeriesMatchRepository
+    private val stumpKtorClient: HttpClient
+    private val stumpClient: StumpClient
+    private val stumpMetadataEventHandler: MetadataEventHandler
+    private val stumpNotificationsHandler: NotificationsEventHandler?
+    private val stumpEventHandler: StumpEventHandler
 
     init {
         val komgaClientFactory = KomgaClientFactory.Builder()
@@ -238,17 +255,85 @@ class MediaServerModule(
             clock = Clock.System,
             eventListeners = listOfNotNull(kavitaMetadataEventHandler, kavitaNotificationsHandler),
         )
+
+        stumpBookThumbnailRepository = BookThumbnailsRepository(
+            mediaServerDatabase.bookThumbnailQueries,
+            MediaServer.STUMP
+        )
+        stumpSerThumbnailsRepository = SeriesThumbnailsRepository(
+            mediaServerDatabase.seriesThumbnailQueries,
+            MediaServer.STUMP
+        )
+        stumpSeriesMatchRepository = SeriesMatchRepository(
+            mediaServerDatabase.seriesMatchQueries,
+            MediaServer.STUMP
+        )
+        stumpKtorClient = ktorBaseClient.config {
+            defaultRequest {
+                url {
+                    this.takeFrom(io.ktor.http.URLBuilder(stumpConfig.baseUri).appendPathSegments("/"))
+                }
+            }
+            install(ContentNegotiation) { json(jsonBase) }
+        }
+        val stumpAuthProvider = StumpApiKeyAuthProvider(stumpConfig.apiKey)
+        stumpClient = StumpClient(stumpKtorClient, jsonBase, stumpConfig.baseUri, stumpAuthProvider)
+        stumpMediaServerClient = StumpMediaServerClientAdapter(stumpClient)
+        stumpMetadataServiceProvider = createMetadataServiceProvider(
+            config = stumpConfig.metadataUpdate,
+            mediaServerClient = stumpMediaServerClient,
+            seriesThumbnailsRepository = stumpSerThumbnailsRepository,
+            bookThumbnailsRepository = stumpBookThumbnailRepository,
+            seriesMatchRepository = stumpSeriesMatchRepository,
+        )
+        stumpMetadataEventHandler = MetadataEventHandler(
+            metadataServiceProvider = stumpMetadataServiceProvider,
+            bookThumbnailsRepository = stumpBookThumbnailRepository,
+            seriesThumbnailsRepository = stumpSerThumbnailsRepository,
+            seriesMatchRepository = stumpSeriesMatchRepository,
+            jobTracker = jobTracker,
+            libraryFilter = {
+                val libraries = stumpConfig.eventListener.metadataLibraryFilter
+                if (libraries.isEmpty()) true
+                else libraries.contains(it)
+            },
+            seriesFilter = { seriesId -> stumpConfig.eventListener.metadataSeriesExcludeFilter.none { seriesId == it } },
+        )
+        stumpNotificationsHandler = NotificationsEventHandler(
+            mediaServerClient = stumpMediaServerClient,
+            appriseService = appriseService,
+            discordWebhookService = discordWebhookService,
+            libraryFilter = {
+                val libraries = stumpConfig.eventListener.notificationsLibraryFilter
+                if (libraries.isEmpty()) true
+                else libraries.contains(it)
+            },
+            mediaServer = MediaServer.STUMP
+        )
+
+        stumpEventHandler = StumpEventHandler(
+            httpClient = stumpKtorClient,
+            baseUrl = stumpConfig.baseUri,
+            authProvider = stumpAuthProvider,
+            eventListeners = listOfNotNull(stumpMetadataEventHandler, stumpNotificationsHandler),
+            json = jsonBase
+        )
+
         if (kavitaConfig.eventListener.enabled) {
             kavitaEventHandler.start()
         }
         if (komgaConfig.eventListener.enabled) {
             komgaEventHandler.start()
         }
+        if (stumpConfig.eventListener.enabled) {
+            stumpEventHandler.start()
+        }
     }
 
     fun close() {
         komgaEventHandler.stop()
         kavitaEventHandler.stop()
+        stumpEventHandler.stop()
     }
 
     private fun createMetadataServiceProvider(

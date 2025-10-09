@@ -14,6 +14,7 @@ import snd.komf.api.MangaDexLink
 data class KomfConfig(
     val komga: KomgaConfigDto,
     val kavita: KavitaConfigDto,
+    val stump: StumpConfigDto,
     val notifications: NotificationConfigDto,
     val metadataProviders: MetadataProvidersConfigDto,
 )
@@ -28,6 +29,13 @@ data class KomgaConfigDto(
 
 @Serializable
 data class KavitaConfigDto(
+    val baseUri: String,
+    val eventListener: EventListenerConfigDto,
+    val metadataUpdate: MetadataUpdateConfigDto,
+)
+
+@Serializable
+data class StumpConfigDto(
     val baseUri: String,
     val eventListener: EventListenerConfigDto,
     val metadataUpdate: MetadataUpdateConfigDto,

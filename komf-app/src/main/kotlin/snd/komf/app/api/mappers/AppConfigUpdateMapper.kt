@@ -10,6 +10,7 @@ import snd.komf.api.config.EventListenerConfigUpdateRequest
 import snd.komf.api.config.KavitaConfigUpdateRequest
 import snd.komf.api.config.KomfConfigUpdateRequest
 import snd.komf.api.config.KomgaConfigUpdateRequest
+import snd.komf.api.config.StumpConfigUpdateRequest
 import snd.komf.api.config.MangaBakaConfigUpdateRequest
 import snd.komf.api.config.MangaDexConfigUpdateRequest
 import snd.komf.api.config.MetadataPostProcessingConfigUpdateRequest
@@ -24,6 +25,7 @@ import snd.komf.mediaserver.config.EventListenerConfig
 import snd.komf.mediaserver.config.KavitaConfig
 import snd.komf.mediaserver.config.KomgaConfig
 import snd.komf.mediaserver.config.MetadataPostProcessingConfig
+import snd.komf.mediaserver.config.StumpConfig
 import snd.komf.mediaserver.config.MetadataProcessingConfig
 import snd.komf.mediaserver.config.MetadataUpdateConfig
 import snd.komf.mediaserver.metadata.PublisherTagNameConfig
@@ -49,6 +51,7 @@ class AppConfigUpdateMapper {
                 ?: config.metadataProviders,
             komga = patch.komga.getOrNull()?.let { komgaConfig(config.komga, it) } ?: config.komga,
             kavita = patch.kavita.getOrNull()?.let { kavitaConfig(config.kavita, it) } ?: config.kavita,
+            stump = patch.stump.getOrNull()?.let { stumpConfig(config.stump, it) } ?: config.stump,
             notifications = config.notifications.copy(
                 apprise = patch.notifications.getOrNull()?.apprise?.getOrNull()
                     ?.let { apprise(config.notifications.apprise, it) }
@@ -295,6 +298,19 @@ class AppConfigUpdateMapper {
     }
 
     private fun kavitaConfig(config: KavitaConfig, patch: KavitaConfigUpdateRequest): KavitaConfig {
+        return config.copy(
+            baseUri = (patch.baseUri.getOrNull() ?: config.baseUri).removeSuffix("/"),
+            apiKey = patch.apiKey.getOrNull() ?: config.apiKey,
+            eventListener = patch.eventListener.getOrNull()
+                ?.let { eventListener(config.eventListener, it) }
+                ?: config.eventListener,
+            metadataUpdate = patch.metadataUpdate.getOrNull()
+                ?.let { metadataUpdate(config.metadataUpdate, it) }
+                ?: config.metadataUpdate,
+        )
+    }
+
+    private fun stumpConfig(config: StumpConfig, patch: StumpConfigUpdateRequest): StumpConfig {
         return config.copy(
             baseUri = (patch.baseUri.getOrNull() ?: config.baseUri).removeSuffix("/"),
             apiKey = patch.apiKey.getOrNull() ?: config.apiKey,

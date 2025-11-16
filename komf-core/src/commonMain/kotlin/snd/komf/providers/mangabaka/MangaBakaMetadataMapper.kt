@@ -20,6 +20,7 @@ import snd.komf.model.WebLink
 import snd.komf.providers.CoreProviders
 import snd.komf.providers.MetadataConfigApplier
 import snd.komf.providers.SeriesMetadataConfig
+import snd.komf.util.toStingEncoded
 
 
 class MangaBakaMetadataMapper(
@@ -91,7 +92,7 @@ class MangaBakaMetadataMapper(
                 link.startsWith("https://www.anime-planet.com") -> WebLink("Anime-Planet", link)
                 link.startsWith("https://www.novelupdates.com") -> WebLink("NovelUpdates", link)
                 link.startsWith("https://mangabaka.dev") -> WebLink("MangaBaka", link)
-                else -> parseUrl(link)?.host?.let { WebLink(it.removePrefix("www."), link) }
+                else -> parseUrl(link)?.let { url -> WebLink(url.host.removePrefix("www."), url.toStingEncoded()) }
             }
         }.sortedBy { it.label }
 
@@ -120,7 +121,7 @@ class MangaBakaMetadataMapper(
     fun toSeriesSearchResult(series: MangaBakaSeries): SeriesSearchResult {
         return SeriesSearchResult(
             url = series.url(),
-            imageUrl = series.cover.small,
+            imageUrl = series.cover.x350?.x1,
             title = series.title,
             provider = CoreProviders.MANGA_BAKA,
             resultId = series.id.value.toString()

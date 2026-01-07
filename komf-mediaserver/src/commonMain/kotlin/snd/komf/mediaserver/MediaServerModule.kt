@@ -11,6 +11,7 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.http.URLBuilder
 import io.ktor.http.appendPathSegments
 import io.ktor.http.takeFrom
@@ -275,6 +276,7 @@ class MediaServerModule(
                 }
             }
             install(ContentNegotiation) { json(jsonBase) }
+            install(WebSockets)
         }
         val stumpAuthProvider = StumpApiKeyAuthProvider(stumpConfig.apiKey)
         stumpClient = StumpClient(stumpKtorClient, jsonBase, stumpConfig.baseUri, stumpAuthProvider)

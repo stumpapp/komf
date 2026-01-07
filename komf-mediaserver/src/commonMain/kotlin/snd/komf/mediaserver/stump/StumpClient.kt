@@ -229,15 +229,15 @@ class StumpClient(
         
         executeGraphQLMutation<Any>(
             mutation = """
-                mutation UpdateSeriesMetadata(${'$'}id: ID!, ${'$'}metadata: SeriesMetadataInput!) {
-                    updateSeriesMetadata(id: ${'$'}id, metadata: ${'$'}metadata) {
+                mutation UpdateSeriesMetadata(${'$'}{'$'}id: ID!, ${'$'}{'$'}input: SeriesMetadataInput!) {
+                    updateSeriesMetadata(id: ${'$'}{'$'}id, input: ${'$'}{'$'}input) {
                         id
                     }
                 }
             """.trimIndent(),
             variables = mapOf(
                 "id" to seriesId.value,
-                "metadata" to metadata
+                "input" to metadata
             )
         )
     }
@@ -280,7 +280,6 @@ class StumpClient(
                             }
                             metadata {
                                 id
-                                seriesId
                                 mediaId
                                 ageRating
                                 day
@@ -370,7 +369,6 @@ class StumpClient(
                             }
                             metadata {
                                 id
-                                seriesId
                                 mediaId
                                 ageRating
                                 day
@@ -436,7 +434,6 @@ class StumpClient(
                         seriesPosition
                         metadata {
                             id
-                            seriesId
                             mediaId
                             ageRating
                             day
@@ -492,7 +489,6 @@ class StumpClient(
                         seriesPosition
                         metadata {
                             id
-                            seriesId
                             mediaId
                             ageRating
                             day
@@ -554,15 +550,15 @@ class StumpClient(
         
         executeGraphQLMutation<Any>(
             mutation = """
-                mutation UpdateMediaMetadata(${'$'}id: ID!, ${'$'}metadata: MediaMetadataInput!) {
-                    updateMediaMetadata(id: ${'$'}id, metadata: ${'$'}metadata) {
+                mutation UpdateMediaMetadata(${'$'}{'$'}id: ID!, ${'$'}{'$'}input: MediaMetadataInput!) {
+                    updateMediaMetadata(id: ${'$'}{'$'}id, input: ${'$'}{'$'}input) {
                         id
                     }
                 }
             """.trimIndent(),
             variables = mapOf(
                 "id" to mediaId.value,
-                "metadata" to metadata
+                "input" to metadata
             )
         )
     }
@@ -601,7 +597,7 @@ class StumpClient(
         executeGraphQLMutation<Any>(
             mutation = """
                 mutation UploadSeriesCover(${'$'}id: ID!, ${'$'}image: String!) {
-                    uploadSeriesCover(id: ${'$'}id, image: ${'$'}image) {
+                    uploadSeriesThumbnailBase64(id: ${'$'}{'$'}id, image: ${'$'}{'$'}image) {
                         id
                     }
                 }
@@ -621,7 +617,7 @@ class StumpClient(
         executeGraphQLMutation<Any>(
             mutation = """
                 mutation UploadMediaCover(${'$'}id: ID!, ${'$'}image: String!) {
-                    uploadMediaCover(id: ${'$'}id, image: ${'$'}image) {
+                    uploadMediaThumbnailBase64(id: ${'$'}{'$'}id, image: ${'$'}{'$'}image) {
                         id
                     }
                 }

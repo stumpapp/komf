@@ -132,11 +132,12 @@ class StumpEventHandler(
     }
 
     private suspend fun handleWebSocketMessage(message: String) {
+        logger.trace { "Received WebSocket message: $message" }
         try {
             val messageJson = json.parseToJsonElement(message).jsonObject
             val type = messageJson["type"]?.jsonPrimitive?.content
             
-            if (type == "data") {
+            if (type == "next" || type == "data") {
                 val data = messageJson["payload"]?.jsonObject?.get("data")?.jsonObject
                 val readEvents = data?.get("readEvents")?.jsonObject
                 
@@ -167,6 +168,8 @@ class StumpEventHandler(
                         MediaServerSeriesId(seriesId),
                         MediaServerLibraryId(libraryId)
                     )
+                } else {
+                    logger.warn { "Invalid CreatedMedia event data: $event" }
                 }
             }
         }

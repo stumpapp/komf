@@ -29,4 +29,5 @@ data class StumpMediaMetadataInput(
     val pageCount: Int? = null,
     val ageRating: Int? = null,
     val language: String? = null,
+    val identifierIsbn: String? = null,
 )

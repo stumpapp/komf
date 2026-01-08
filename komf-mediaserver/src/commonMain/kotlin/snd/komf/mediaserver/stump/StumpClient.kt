@@ -7,7 +7,15 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -34,7 +42,7 @@ class StumpClient(
             query = """
                 query GetLibraries(${'$'}pagination: Pagination!) {
                     libraries(pagination: ${'$'}pagination) {
-                        data {
+                        nodes {
                             id
                             name
                             description
@@ -68,14 +76,14 @@ class StumpClient(
                 )
             )
         )
-        return response.libraries.data
+        return response.libraries.nodes
     }
 
     suspend fun getLibrary(libraryId: StumpLibraryId): StumpLibrary {
         return executeGraphQLQuery<GetLibraryResponse>(
             query = """
                 query GetLibrary(${'$'}id: ID!) {
-                    library(id: ${'$'}id) {
+                    libraryById(id: ${'$'}id) {
                         id
                         name
                         description
@@ -101,7 +109,7 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf("id" to libraryId.value)
-        ).library
+        ).libraryById ?: throw StumpGraphQLException("Library not found: ${libraryId.value}")
     }
 
     suspend fun scanLibrary(libraryId: StumpLibraryId) {
@@ -118,9 +126,9 @@ class StumpClient(
     suspend fun getSeries(libraryId: StumpLibraryId, page: Int = 1, pageSize: Int = 500): StumpPage<StumpSeries> {
         val response = executeGraphQLQuery<GetSeriesResponse>(
             query = """
-                query GetSeries(${'$'}libraryId: ID!, ${'$'}pagination: Pagination!) {
-                    series(libraryId: ${'$'}libraryId, pagination: ${'$'}pagination) {
-                        data {
+                query GetSeries(${'$'}filter: SeriesFilterInput!, ${'$'}pagination: Pagination!) {
+                    series(filter: ${'$'}filter, pagination: ${'$'}pagination) {
+                        nodes {
                             id
                             name
                             description
@@ -139,14 +147,25 @@ class StumpClient(
                                 ageRating
                                 booktype
                                 comicid
+                                comicImage
+                                descriptionFormatted
                                 imprint
                                 metaType
+                                publicationRun
                                 publisher
                                 status
                                 summary
                                 title
+                                totalIssues
                                 volume
+                                year
                                 characters
+                                collects {
+                                    series
+                                    comicid
+                                    issueid
+                                    issues
+                                }
                                 genres
                                 links
                                 writers
@@ -155,6 +174,7 @@ class StumpClient(
                         pageInfo {
                             ... on OffsetPaginationInfo {
                                 totalPages
+                                totalItems
                                 currentPage
                                 pageSize
                                 pageOffset
@@ -165,7 +185,9 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf(
-                "libraryId" to libraryId.value,
+                "filter" to mapOf(
+                    "libraryId" to mapOf("eq" to libraryId.value)
+                ),
                 "pagination" to mapOf(
                     "offset" to mapOf(
                         "page" to page,
@@ -176,9 +198,9 @@ class StumpClient(
         )
         
         return StumpPage(
-            content = response.series.data,
+            content = response.series.nodes,
             totalPages = response.series.pageInfo?.totalPages,
-            totalElements = null, // TODO(stump): Not available in OffsetPaginationInfo
+            totalElements = response.series.pageInfo?.totalItems,
             currentPage = response.series.pageInfo?.currentPage ?: page,
             pageSize = response.series.pageInfo?.pageSize ?: pageSize,
             hasNext = response.series.pageInfo?.let { it.currentPage < it.totalPages } ?: false,
@@ -190,7 +212,7 @@ class StumpClient(
         return executeGraphQLQuery<GetSeriesDetailResponse>(
             query = """
                 query GetSeriesDetail(${'$'}id: ID!) {
-                    series(id: ${'$'}id) {
+                    seriesById(id: ${'$'}id) {
                         id
                         name
                         description
@@ -205,23 +227,38 @@ class StumpClient(
                             name
                         }
                         metadata {
-                            id
+                            seriesId
                             title
                             summary
                             publisher
-                            totalIssues
-                            publicationYear
-                            language
                             status
-                            genre
-                            tags
+                            genres
                             ageRating
+                            booktype
+                            comicid
+                            comicImage
+                            descriptionFormatted
+                            imprint
+                            metaType
+                            publicationRun
+                            totalIssues
+                            volume
+                            year
+                            characters
+                            collects {
+                                series
+                                comicid
+                                issueid
+                                issues
+                            }
+                            links
+                            writers
                         }
                     }
                 }
             """.trimIndent(),
             variables = mapOf("id" to seriesId.value)
-        ).series
+        ).seriesById ?: throw StumpGraphQLException("Series not found: ${seriesId.value}")
     }
 
     suspend fun updateSeriesMetadata(seriesId: StumpSeriesId, metadata: StumpSeriesMetadataInput) {
@@ -229,15 +266,15 @@ class StumpClient(
         
         executeGraphQLMutation<Any>(
             mutation = """
-                mutation UpdateSeriesMetadata(${'$'}{'$'}id: ID!, ${'$'}{'$'}input: SeriesMetadataInput!) {
-                    updateSeriesMetadata(id: ${'$'}{'$'}id, input: ${'$'}{'$'}input) {
+                mutation UpdateSeriesMetadata(${'$'}id: ID!, ${'$'}input: SeriesMetadataInput!) {
+                    updateSeriesMetadata(id: ${'$'}id, input: ${'$'}input) {
                         id
                     }
                 }
             """.trimIndent(),
             variables = mapOf(
                 "id" to seriesId.value,
-                "input" to metadata
+                "input" to json.encodeToJsonElement(metadata)
             )
         )
     }
@@ -256,12 +293,11 @@ class StumpClient(
     suspend fun getMedia(seriesId: StumpSeriesId, page: Int = 1, pageSize: Int = 500): StumpPage<StumpMedia> {
         val response = executeGraphQLQuery<GetMediaResponse>(
             query = """
-                query GetMedia(${'$'}seriesId: ID!, ${'$'}pagination: Pagination!) {
-                    media(seriesId: ${'$'}seriesId, pagination: ${'$'}pagination) {
-                        data {
+                query GetMedia(${'$'}filter: MediaFilterInput!, ${'$'}pagination: Pagination!) {
+                    media(filter: ${'$'}filter, pagination: ${'$'}pagination) {
+                        nodes {
                             id
                             name
-                            description
                             path
                             size
                             extension
@@ -282,6 +318,7 @@ class StumpClient(
                                 id
                                 mediaId
                                 ageRating
+                                format
                                 day
                                 language
                                 month
@@ -290,11 +327,15 @@ class StumpClient(
                                 pageCount
                                 publisher
                                 series
+                                seriesGroup
+                                storyArc
+                                storyArcNumber
                                 summary
                                 title
                                 titleSort
                                 volume
                                 year
+                                identifierIsbn
                                 writers
                                 genres
                                 characters
@@ -311,6 +352,7 @@ class StumpClient(
                         pageInfo {
                             ... on OffsetPaginationInfo {
                                 totalPages
+                                totalItems
                                 currentPage
                                 pageSize
                                 pageOffset
@@ -321,7 +363,9 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf(
-                "seriesId" to seriesId.value,
+                "filter" to mapOf(
+                    "seriesId" to mapOf("eq" to seriesId.value)
+                ),
                 "pagination" to mapOf(
                     "offset" to mapOf(
                         "page" to page,
@@ -332,9 +376,9 @@ class StumpClient(
         )
         
         return StumpPage(
-            content = response.media.data,
+            content = response.media.nodes,
             totalPages = response.media.pageInfo?.totalPages,
-            totalElements = null,  // TODO(stump): Not available in OffsetPaginationInfo
+            totalElements = response.media.pageInfo?.totalItems,
             currentPage = response.media.pageInfo?.currentPage ?: page,
             pageSize = response.media.pageInfo?.pageSize ?: pageSize,
             hasNext = response.media.pageInfo?.let { it.currentPage < it.totalPages } ?: false,
@@ -345,12 +389,11 @@ class StumpClient(
     suspend fun getAllMedia(seriesId: StumpSeriesId): List<StumpMedia> {
         val response = executeGraphQLQuery<GetAllMediaResponse>(
             query = """
-                query GetAllMedia(${'$'}seriesId: ID!, ${'$'}pagination: Pagination!) {
-                    media(seriesId: ${'$'}seriesId, pagination: ${'$'}pagination) {
-                        data {
+                query GetAllMedia(${'$'}filter: MediaFilterInput!, ${'$'}pagination: Pagination!) {
+                    media(filter: ${'$'}filter, pagination: ${'$'}pagination) {
+                        nodes {
                             id
                             name
-                            description
                             path
                             size
                             extension
@@ -371,6 +414,7 @@ class StumpClient(
                                 id
                                 mediaId
                                 ageRating
+                                format
                                 day
                                 language
                                 month
@@ -379,11 +423,15 @@ class StumpClient(
                                 pageCount
                                 publisher
                                 series
+                                seriesGroup
+                                storyArc
+                                storyArcNumber
                                 summary
                                 title
                                 titleSort
                                 volume
                                 year
+                                identifierIsbn
                                 writers
                                 genres
                                 characters
@@ -401,7 +449,9 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf(
-                "seriesId" to seriesId.value,
+                "filter" to mapOf(
+                    "seriesId" to mapOf("eq" to seriesId.value)
+                ),
                 "pagination" to mapOf(
                     "none" to mapOf(
                         "unpaginated" to true
@@ -410,17 +460,16 @@ class StumpClient(
             )
         )
         
-        return response.media.data
+        return response.media.nodes
     }
 
     suspend fun getMedia(mediaId: StumpMediaId): StumpMedia {
         return executeGraphQLQuery<GetMediaDetailResponse>(
             query = """
                 query GetMediaDetail(${'$'}id: ID!) {
-                    media(id: ${'$'}id) {
+                    mediaById(id: ${'$'}id) {
                         id
                         name
-                        description
                         path
                         size
                         extension
@@ -436,6 +485,7 @@ class StumpClient(
                             id
                             mediaId
                             ageRating
+                            format
                             day
                             language
                             month
@@ -444,11 +494,15 @@ class StumpClient(
                             pageCount
                             publisher
                             series
+                            seriesGroup
+                            storyArc
+                            storyArcNumber
                             summary
                             title
                             titleSort
                             volume
                             year
+                            identifierIsbn
                             writers
                             genres  
                             characters
@@ -465,17 +519,16 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf("id" to mediaId.value)
-        ).media
+        ).mediaById ?: throw StumpGraphQLException("Media not found: ${mediaId.value}")
     }
 
     suspend fun getMediaWithSeries(mediaId: StumpMediaId): StumpMediaWithSeries {
         return executeGraphQLQuery<GetMediaWithSeriesResponse>(
             query = """
                 query GetMediaWithSeries(${'$'}id: ID!) {
-                    media(id: ${'$'}id) {
+                    mediaById(id: ${'$'}id) {
                         id
                         name
-                        description
                         path
                         size
                         extension
@@ -491,6 +544,7 @@ class StumpClient(
                             id
                             mediaId
                             ageRating
+                            format
                             day
                             language
                             month
@@ -499,11 +553,15 @@ class StumpClient(
                             pageCount
                             publisher
                             series
+                            seriesGroup
+                            storyArc
+                            storyArcNumber
                             summary
                             title
                             titleSort
                             volume
                             year
+                            identifierIsbn
                             writers
                             genres  
                             characters
@@ -525,14 +583,25 @@ class StumpClient(
                                 ageRating
                                 booktype
                                 comicid
+                                comicImage
+                                descriptionFormatted
                                 imprint
                                 metaType
+                                publicationRun
                                 publisher
                                 status
                                 summary
                                 title
+                                totalIssues
                                 volume
+                                year
                                 characters
+                                collects {
+                                    series
+                                    comicid
+                                    issueid
+                                    issues
+                                }
                                 genres
                                 links
                                 writers
@@ -542,7 +611,7 @@ class StumpClient(
                 }
             """.trimIndent(),
             variables = mapOf("id" to mediaId.value)
-        ).media
+        ).mediaById ?: throw StumpGraphQLException("Media not found: ${mediaId.value}")
     }
 
     suspend fun updateMediaMetadata(mediaId: StumpMediaId, metadata: StumpMediaMetadataInput) {
@@ -550,15 +619,15 @@ class StumpClient(
         
         executeGraphQLMutation<Any>(
             mutation = """
-                mutation UpdateMediaMetadata(${'$'}{'$'}id: ID!, ${'$'}{'$'}input: MediaMetadataInput!) {
-                    updateMediaMetadata(id: ${'$'}{'$'}id, input: ${'$'}{'$'}input) {
+                mutation UpdateMediaMetadata(${'$'}id: ID!, ${'$'}input: MediaMetadataInput!) {
+                    updateMediaMetadata(id: ${'$'}id, input: ${'$'}input) {
                         id
                     }
                 }
             """.trimIndent(),
             variables = mapOf(
                 "id" to mediaId.value,
-                "input" to metadata
+                "input" to json.encodeToJsonElement(metadata)
             )
         )
     }
@@ -597,7 +666,7 @@ class StumpClient(
         executeGraphQLMutation<Any>(
             mutation = """
                 mutation UploadSeriesCover(${'$'}id: ID!, ${'$'}image: String!) {
-                    uploadSeriesThumbnailBase64(id: ${'$'}{'$'}id, image: ${'$'}{'$'}image) {
+                    uploadSeriesThumbnailBase64(id: ${'$'}id, image: ${'$'}image) {
                         id
                     }
                 }
@@ -617,7 +686,7 @@ class StumpClient(
         executeGraphQLMutation<Any>(
             mutation = """
                 mutation UploadMediaCover(${'$'}id: ID!, ${'$'}image: String!) {
-                    uploadMediaThumbnailBase64(id: ${'$'}{'$'}id, image: ${'$'}{'$'}image) {
+                    uploadMediaThumbnailBase64(id: ${'$'}id, image: ${'$'}image) {
                         id
                     }
                 }
@@ -635,7 +704,7 @@ class StumpClient(
     ): T {
         val request = StumpGraphQLRequest(
             query = query, 
-            variables = variables.mapValues { it.value.toString() }
+            variables = variables.mapValues { toJsonElement(it.value) }
         )
         val response = ktor.post("api/graphql") {
             contentType(ContentType.Application.Json)
@@ -647,14 +716,20 @@ class StumpClient(
             throw StumpGraphQLException("GraphQL request failed with status ${response.status}")
         }
 
-        val graphqlResponse = response.body<StumpGraphQLResponse<T>>()
+        val responseText = response.bodyAsText()
+        val jsonResponse = json.parseToJsonElement(responseText).jsonObject
         
-        if (graphqlResponse.errors?.isNotEmpty() == true) {
-            val errorMessages = graphqlResponse.errors.map { it.message }
+        val errors = jsonResponse["errors"]?.let { 
+            json.decodeFromJsonElement<List<StumpGraphQLError>>(it) 
+        }
+        
+        if (errors?.isNotEmpty() == true) {
+            val errorMessages = errors.map { it.message }
             throw StumpGraphQLException("GraphQL errors: ${errorMessages.joinToString(", ")}", errorMessages)
         }
         
-        return graphqlResponse.data ?: throw StumpGraphQLException("GraphQL response data is null")
+        val data = jsonResponse["data"] ?: throw StumpGraphQLException("GraphQL response data is null")
+        return json.decodeFromJsonElement<T>(data)
     }
 
     private suspend inline fun <reified T> executeGraphQLMutation(
@@ -662,6 +737,19 @@ class StumpClient(
         variables: Map<String, Any?> = emptyMap()
     ): T {
         return executeGraphQLQuery(mutation, variables)
+    }
+
+    private fun toJsonElement(value: Any?): JsonElement {
+        return when (value) {
+            null -> JsonNull
+            is JsonElement -> value
+            is String -> JsonPrimitive(value)
+            is Number -> JsonPrimitive(value)
+            is Boolean -> JsonPrimitive(value)
+            is Map<*, *> -> JsonObject(value.entries.associate { (k, v) -> k.toString() to toJsonElement(v) })
+            is List<*> -> JsonArray(value.map { toJsonElement(it) })
+            else -> JsonPrimitive(value.toString())
+        }
     }
 }
 
@@ -680,36 +768,36 @@ interface StumpAuthProvider {
 private data class GetLibrariesResponse(val libraries: StumpPagedResponse<StumpLibrary>)
 
 @Serializable
-private data class GetLibraryResponse(val library: StumpLibrary)
+private data class GetLibraryResponse(val libraryById: StumpLibrary?)
 
 @Serializable
 private data class GetSeriesResponse(val series: StumpPagedResponse<StumpSeries>)
 
 @Serializable
-private data class GetSeriesDetailResponse(val series: StumpSeries)
+private data class GetSeriesDetailResponse(val seriesById: StumpSeries?)
 
 @Serializable
 private data class GetMediaResponse(val media: StumpPagedResponse<StumpMedia>)
 
 @Serializable
-private data class GetAllMediaResponse(val media: StumpUnpagedResponse<StumpMedia>)
+private data class GetAllMediaResponse(val media: StumpNodesResponse<StumpMedia>)
 
 @Serializable
-private data class GetMediaDetailResponse(val media: StumpMedia)
+private data class GetMediaDetailResponse(val mediaById: StumpMedia?)
 
 @Serializable
 private data class StumpPagedResponse<T>(
-    val data: List<T>,
+    val nodes: List<T>,
     val pageInfo: StumpPaginationInfo?
 )
 
 @Serializable
-private data class StumpUnpagedResponse<T>(
-    val data: List<T>
+private data class StumpNodesResponse<T>(
+    val nodes: List<T>
 )
 
 @Serializable
 private data class ScanSeriesResponse(val scanSeries: Boolean)
 
 @Serializable
-private data class GetMediaWithSeriesResponse(val media: StumpMediaWithSeries)
+private data class GetMediaWithSeriesResponse(val mediaById: StumpMediaWithSeries?)

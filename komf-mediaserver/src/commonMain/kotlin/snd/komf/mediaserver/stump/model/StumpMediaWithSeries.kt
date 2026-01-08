@@ -1,20 +1,18 @@
 package snd.komf.mediaserver.stump.model
 
-import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class StumpMediaWithSeries(
     val id: StumpMediaId,
     val name: String,
-    val description: String? = null,
     val path: String,
     val size: Long,
     val extension: String,
     val pages: Int,
     val status: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
+    val createdAt: String,
+    val updatedAt: String? = null,
     val seriesId: StumpSeriesId,
     val libraryId: StumpLibraryId? = null,
     val hash: String? = null,
@@ -33,5 +31,25 @@ data class StumpMediaSeriesSelection(
 
 @Serializable
 data class StumpSeriesMetadataBasic(
-    val title: String? = null
+    val seriesId: String,
+    val ageRating: Int? = null,
+    val booktype: String? = null,
+    val comicid: Int? = null,
+    val comicImage: String? = null,
+    val descriptionFormatted: String? = null,
+    val imprint: String? = null,
+    val metaType: String? = null,
+    val publicationRun: String? = null,
+    val publisher: String? = null,
+    val status: String? = null,
+    val summary: String? = null,
+    val title: String? = null,
+    val totalIssues: Int? = null,
+    val volume: Int? = null,
+    val year: Int? = null,
+    val characters: List<String> = emptyList(),
+    val collects: List<StumpCollectedItem> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val links: List<String> = emptyList(),
+    val writers: List<String> = emptyList(),
 )

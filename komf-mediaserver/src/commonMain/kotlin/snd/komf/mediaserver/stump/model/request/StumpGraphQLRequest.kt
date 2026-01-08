@@ -1,11 +1,12 @@
 package snd.komf.mediaserver.stump.model.request
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class StumpGraphQLRequest(
     val query: String,
-    val variables: Map<String, String> = emptyMap(),
+    val variables: Map<String, JsonElement> = emptyMap(),
 )
 
 @Serializable

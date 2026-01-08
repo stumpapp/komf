@@ -1,6 +1,5 @@
 package snd.komf.mediaserver.stump.model
 
-import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
 import snd.komf.mediaserver.model.MediaServerLibraryId
 
@@ -19,8 +18,8 @@ data class StumpLibrary(
     val description: String? = null,
     val path: String,
     val status: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
+    val createdAt: String,
+    val updatedAt: String? = null,
     val tags: List<StumpTag> = emptyList(),
     val config: StumpLibraryConfig? = null,
 )

@@ -233,7 +233,6 @@ private fun StumpMediaWithSeries.toStumpMedia(): StumpMedia {
     return StumpMedia(
         id = id,
         name = name,
-        description = description,
         path = path,
         size = size,
         extension = extension,
@@ -320,7 +319,7 @@ private fun StumpMediaMetadata.toMediaServerBookMetadata(): MediaServerBookMetad
         releaseDate = createReleaseDate(year, month, day),
         authors = allAuthors,
         tags = genres,
-        isbn = null, // TODO(stump): Add ISBN support when available in schema
+        isbn = identifierIsbn,
         links = links.map { WebLink(it, it) },
 
         // Lock fields - Stump doesn't have explicit lock support yet
@@ -370,6 +369,7 @@ private fun MediaServerBookMetadataUpdate.toStumpMediaMetadataInput(): StumpMedi
         year = releaseYear,
         month = releaseMonth,
         day = releaseDay,
+        identifierIsbn = isbn,
         colorists = authors?.filter { it.role == "COLORIST" }?.map { it.name } ?: emptyList(),
         editors = authors?.filter { it.role == "EDITOR" }?.map { it.name } ?: emptyList(),
         genres = tags?.toList() ?: emptyList(),
@@ -421,7 +421,7 @@ private fun createDefaultSeriesMetadata(series: StumpSeries): MediaServerSeriesM
 private fun createDefaultBookMetadata(media: StumpMedia): MediaServerBookMetadata {
     return MediaServerBookMetadata(
         title = media.name,
-        summary = media.description,
+        summary = null,
         number = media.seriesPosition.toString(),
         numberSort = media.seriesPosition.toString(),
         releaseDate = null,

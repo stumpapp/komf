@@ -16,9 +16,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.put
 import snd.komf.mediaserver.BookEvent
 import snd.komf.mediaserver.MediaServerEventListener
 import snd.komf.mediaserver.SeriesEvent
@@ -90,8 +91,9 @@ class StumpEventHandler(
                 method = HttpMethod.Get,
                 host = extractHost(baseUrl),
                 port = extractPort(baseUrl),
-                path = "/api/graphql",
+                path = "/api/graphql/ws",
                 request = {
+                    header("Sec-WebSocket-Protocol", "graphql-transport-ws")
                     authHeaders.forEach { name, values ->
                         values.forEach { value ->
                             header(name, value)
@@ -100,17 +102,17 @@ class StumpEventHandler(
                 }
             ) {
 
-                send(Frame.Text(json.encodeToString(mapOf(
-                    "type" to "connection_init"
-                ))))
+                send(Frame.Text(buildJsonObject {
+                    put("type", "connection_init")
+                }.toString()))
 
-                send(Frame.Text(json.encodeToString(mapOf(
-                    "id" to "1",
-                    "type" to "start",
-                    "payload" to mapOf(
-                        "query" to subscriptionQuery
-                    )
-                ))))
+                send(Frame.Text(buildJsonObject {
+                    put("id", "1")
+                    put("type", "subscribe")
+                    put("payload", buildJsonObject {
+                        put("query", subscriptionQuery)
+                    })
+                }.toString()))
 
                 while (isActive) {
                     val frame = incoming.receive()
@@ -196,7 +198,7 @@ class StumpEventHandler(
 
     private fun extractPort(url: String): Int {
         val afterProtocol = url.substringAfter("://")
-        return if (":" in afterProtocol && "/" in afterProtocol) {
+        return if (":" in afterProtocol) {
             val portSection = afterProtocol.substringAfter(":").substringBefore("/")
             portSection.toIntOrNull() ?: if (url.startsWith("https")) 443 else 80
         } else {

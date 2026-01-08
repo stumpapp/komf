@@ -155,6 +155,19 @@ kavita:
         orderBooks: false # will order books using parsed volume or chapter number. works only with COMIC_INFO
         languageValue: # set default language for series. Must use BCP 47 format e.g. "en"
 
+stump:
+  baseUri: "http://localhost:10801" #or env:KOMF_STUMP_BASE_URI
+  apiKey: "your-api-key-here" #or env:KOMF_STUMP_API_KEY
+  eventListener:
+    enabled: false # if disabled will not connect to stump and won't pick up newly added entries
+    metadataLibraryFilter: [ ] # listen to all events if empty
+  metadataUpdate:
+    default:
+      libraryType: "MANGA"
+      updateModes: [ API ]
+      seriesCovers: false
+      bookCovers: false
+
 notifications:
   templatesDirectory: "./" # path to a directory with templates
   discord:
